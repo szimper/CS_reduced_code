@@ -5,7 +5,7 @@ Created on Thu Sep  5 12:51:41 2024
 @author: sebzi
 
 Code for the reduced inertial and hydrodynamic descriptions of the Cucker-Smale 
-model in one dimension.. A finite difference scheme is used to discretise the 
+model in one dimension. A finite difference scheme is used to discretise the 
 spatial component and the odeint package to solve the resulting system of ODEs 
 to compute the PDEs.
 """
@@ -16,8 +16,9 @@ from scipy.integrate import odeint
 
 
 #spatial interval over which to compute the solution
-xL, xR , dx = 0.0 , 1.0 , 0.005
+xL, xR , dx = -50.0 , 50.0 , 0.5
 x = np.arange(xL,xR, dx)
+L = 100 #length of the periodic domain
 
 @njit(fastmath=True)
 def first_deriv(xL,xR,yB,yT,dx):
@@ -35,7 +36,7 @@ def first_deriv(xL,xR,yB,yT,dx):
 def phi(ud):
     r = 0.5
     gamma = 1.0 
-    u_periodic = np.minimum( ud, xR-xL-ud)
+    u_periodic = np.minimum( ud, L-ud)
     return gamma*1.0/((1.0+u_periodic**2)**r) 
 
 
@@ -122,7 +123,7 @@ def fH(z0,t,A,a_c): #function for the hydrodynamic PDE
 ######
 #The functions below are for computing initial data rho, j and u from particle data
 def vonmises(x,mu,kappa):
-    x2 = 2*np.pi*x
+    x2 = 2*np.pi*x/L
     y = np.exp(kappa*np.cos(x2-2*np.pi*mu))
     
     return y/(np.sum(y)*dx )
@@ -131,7 +132,7 @@ def vonmises(x,mu,kappa):
 def rho(x_pos,x):
     N = len(x_pos)
 
-    epsilon = 5.0 
+    epsilon = 1.0 
     
     rho_d = 0
     for i in x_pos:
@@ -141,7 +142,7 @@ def rho(x_pos,x):
 
 def j(x_pos,v,x):
     N = len(x_pos)
-    epsilon = 5.0 
+    epsilon = 1.0 
     
     j_d = 0
     for i in range(len(x_pos)):
@@ -154,7 +155,7 @@ def j(x_pos,v,x):
 #function for calculating the initial weight in case the modified inertial PDE is used
 def w_I(rho_I,x_pos,v):
     N = len(x_pos)
-    epsilon = 5.0 
+    epsilon = 1.0 
     v_m = np.mean(v)
     
     w_d = np.zeros(len(x),dtype=np.float64) 
@@ -211,3 +212,70 @@ solH = odeint(fH, I0H, t,args=(A,a_c))
 
 rhoH = solH[:,:int(len(I0)/2)]
 u = solH[:,int(len(I0)/2):]
+
+'''
+for Figs. 4 and 5 where a large number of realisations (M) of the CS model and
+inertial reduced PDE are compared, the initial CS data is loaded to initialise
+the PDE which is then simulated for each realisation of the CS model. This is done
+for different parameter values as well: in Fig. 4 for different N; Fig. 5a) 
+different initial velocity spread; while in Fig 5b) the epsilon when initilasing 
+the PDE is changed in the PDE simulations.
+'''
+
+@njit(fastmath=True) #function for constructing the PDE initial data
+def mean(XM,VM,M_c):
+
+    rho_F = np.zeros( (len(x),M_c) , dtype=np.float64)
+    j_F = np.zeros( (len(x),M_c) , dtype=np.float64)    
+    
+    for i in range(M_c):
+        
+        Xf = XM[i,:]
+        Vf = VM[i,:]
+        
+        rho_s = rho(Xf,x)
+        j_s = j(Xf,Vf,x)
+        
+        rho_F[:,i] = rho_s
+        j_F[:,i] = j_s
+    
+    return rho_F, j_F 
+
+
+Ns = np.array([2**4,2**5,2**6,2**7, 2**8,2**9, 2**10,2**11,2**12,2**13,2**14,2**15 ])  
+
+def PDE_multi(M):
+    
+    for k in Ns:
+        #loading the initial data of the CS model for different values of N
+        XiM = np.load('ABM_t0_m1e2_N' + str(k) + 'X.npy')
+        ViM = np.load('ABM_t0_m1e2_N' + str(k) + 'V.npy')
+        
+        
+        rho_PDE_M = np.zeros( (len(x),M) , dtype=np.float64)
+        j_PDE_M = np.zeros( (len(x),M) , dtype=np.float64)    
+        
+    
+        rhoI , jI = mean(XiM,ViM,M)
+        
+        for i in range(M):
+            vmean = np.mean(ViM[i])
+            
+            I0 = np.concatenate((rhoI[:,i],jI[:,i]))
+            
+            w0 = w_I(rhoI[:,i],XiM[i,:],ViM[i,:])  
+            
+            sol = odeint(fI, I0, t,args=(A,vmean,w0))
+            
+            
+            rho_PDE_M[:,i] = sol[-1,:int(len(I0)/2)]
+            j_PDE_M[:,i] = sol[-1,int(len(I0)/2):]
+        
+        #saving the PDE data at the final time
+        np.save("CS_PDE_N"+ str(k) + "_rho_t2_M1e2.npy",rho_PDE_M)
+        np.save("CS_PDE_N"+ str(k) + "_j_t2_M1e2.npy",j_PDE_M)
+        
+    return rho_PDE_M, j_PDE_M
+
+
+a, b = PDE_multi(int(1e2))
