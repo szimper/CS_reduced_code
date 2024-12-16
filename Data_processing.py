@@ -11,11 +11,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 #spatial grid on which the PDE was solved
-xL, xR , dx = 0.0 , 1.0 , 0.005 
+xL, xR , dx = -50.0 , 50.0 , 0.5
 x = np.arange(xL,xR, dx)
+L = 100 #length of the periodic domain
 
 def vonmises(x,mu,kappa):
-    x2 = 2*np.pi*x
+    x2 = 2*np.pi*x/L
     y = np.exp(kappa*np.cos(x2-2*np.pi*mu))
     
     return y/(np.sum(y)*dx )
@@ -24,7 +25,7 @@ def vonmises(x,mu,kappa):
 def rho(x_pos,x):
     N = len(x_pos)
     
-    epsilon = 5.0 
+    epsilon = 1.0 
 
     rho_d = 0
     for i in x_pos:
@@ -33,7 +34,7 @@ def rho(x_pos,x):
 
 def j(x_pos,v,x):
     N = len(x_pos)
-    epsilon = 5.0 
+    epsilon = 1.0 
     
     j_d = 0
     for i in range(len(x_pos)):
@@ -43,8 +44,73 @@ def j(x_pos,v,x):
     return j_d
 
 
+def mean(XM,VM,M_c):
+
+    rho_F = np.zeros( (len(x),M_c) , dtype=np.float64)
+    j_F = np.zeros( (len(x),M_c) , dtype=np.float64)    
+    
+    for i in range(M_c):
+        
+        Xf = XM[i,:]
+        Vf = VM[i,:]
+        
+        rho_s = rho(Xf,x)
+        j_s = j(Xf,Vf,x)
+        
+        rho_F[:,i] = rho_s
+        j_F[:,i] = j_s
+    
+    return rho_F, j_F 
+
 def L2(g):
     return np.sum(g**2)*dx
+
+'''
+Comparison of the CS model and the inertial PDE as presented in Fig. 4. for 
+a vairety of different particle numbers N each for a total of M=1e2 total
+realisations of the randomly generated initial conditions. The errors are 
+computed in the L2 square norm.
+'''
+
+Ns = np.array([2**4,2**5,2**6,2**7, 2**8,2**9, 2**10,2**11,2**12,2**13,2**14,2**15])   
+
+M = int(10**2)
+
+errs = np.zeros(len(Ns),dtype=np.float64)
+
+for k in range(len(Ns)):
+    XfM = np.load('ABM_t0_m1e2_N' + str(k) + 'X.npy')
+    VfM = np.load('ABM_t0_m1e2_N' + str(k) + 'V.npy')
+
+    rhoFA , jFA = mean(XfM,VfM,M)
+
+    rho_PDE_M = np.load("CS_PDE_N"+ str(k) + "_rho_t2_M1e2.npy")
+    j_PDE_M = np.load("CS_PDE_N"+ str(k) + "_j_t2_M1e2.npy")
+    
+    err_d = []
+    
+    for i in range(M):
+
+        v_m = np.mean(VfM[i])
+        err_d.append(v_m**2*L2(rho_PDE_M[:,i] - rhoFA[:,i] ) + L2(j_PDE_M[:,i] - jFA[:,i]))
+    
+    errs[k] = np.mean(np.array(err_d))
+    
+
+plt.figure()
+plt.rcParams.update({'text.usetex': True,'text.latex.preamble': r'\usepackage{amsfonts}'})
+plt.xlabel(r"$N$")
+plt.ylabel(r"$\mathbb{E} [  ||X_{PDE}(t) - X_{CS}(t)||^2_{L^2} ]$")
+plt.xscale("log")
+plt.yscale("log")
+plt.plot(Ns,errs,linestyle='--',marker='o')
+plt.plot(Ns,0.05*((Ns).astype(np.float64))**(-1),c='k', label = r"$ \propto N^{-1} $")
+plt.legend()
+plt.tight_layout()
+
+
+
+
 
 '''
 comparison of the inertial PDE and hydrodynamic PDE with the particles system
