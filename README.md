@@ -7,10 +7,10 @@ The python code in this repository can be used to simulate the Cucker-Smale mode
 
 * simulations of the one and two dimensional CS model, `CS_1D.py` and `CS_2D.py`, respectively.
 * simulations of the reduced inertial PDE model and hydrodynamic model in one dimension `PDEs_IH_1D.py`.
+* simulations of the reduced stochastic PDE model `SPDE.py`.
 * the reduced inertial PDE model in two dimensions `Inertial_PDE_2D.py`.
 * processing the data generated `Data_processing.py`.
 
-The code in this repository is for single realisations of the system, but it is straighforward to parralise it for different inital conditions/parameter settings.
 
 ## Citation
 If you use these files in your academic projects, we politely ask you to aknowledge it in your manuscript by the following BibTex citation:
