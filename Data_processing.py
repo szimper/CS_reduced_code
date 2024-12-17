@@ -17,7 +17,7 @@ L = 100 #length of the periodic domain
 
 def vonmises(x,mu,kappa):
     x2 = 2*np.pi*x/L
-    y = np.exp(kappa*np.cos(x2-2*np.pi*mu))
+    y = np.exp(kappa*np.cos(x2-2*np.pi*mu)*L)
     
     return y/(np.sum(y)*dx )
 

@@ -124,7 +124,7 @@ def fH(z0,t,A,a_c): #function for the hydrodynamic PDE
 #The functions below are for computing initial data rho, j and u from particle data
 def vonmises(x,mu,kappa):
     x2 = 2*np.pi*x/L
-    y = np.exp(kappa*np.cos(x2-2*np.pi*mu))
+    y = np.exp(kappa*np.cos(x2-2*np.pi*mu)*L)
     
     return y/(np.sum(y)*dx )
 
